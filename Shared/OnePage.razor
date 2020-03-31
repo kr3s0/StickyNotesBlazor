@@ -1,0 +1,67 @@
+﻿@using DataAccess.Models
+@using Microsoft.AspNetCore.ProtectedBrowserStorage
+
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+
+<div class="col-xs-12 col-sm-6 col-md-4">
+    <div class="image-flip @hoverclass" @ontouchstart="@ToggleHover">
+        <div class="mainflip">
+            <div class="frontside">
+                <div class="card mr-4 mb-4">
+                    <div class="card-body text-center">
+                        <p><img class=" img-fluid" src="/recorder.svg" alt="card image"></p>
+                        <h4 class="card-title">@Model.Name</h4>
+                        <p class="card-text">I am page in  @SectionName section, flip me for details.</p>
+                        <p><i>@Model.DateOfCreation</i></p>
+                    </div>
+                </div>
+            </div>
+            <div class="backside">
+                <div class="card">
+                    <div class="card-body text-center mt-4">
+                        <h4 class="card-title">Details about page</h4>
+                        <p class="card-text">@Model.Details</p>
+                        <button type="button" class="btn btn-secondary" @onclick="@OpenPage">Open page</button>
+                        <br />
+                        <br />
+                        <a href="Pages" class="text-danger pull-right" @onclick="@(()=>OnClickCallback.InvokeAsync(Model.Page))"><i class="fa fa-trash-o "> Delete</i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code{
+    [Parameter]
+    public PageModel Model { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> OnClickCallback { get; set; }
+
+    [Parameter]
+    public string SectionName { get; set; }
+
+    private string hoverclass;
+
+    private void ToggleHover()
+    {
+        if (hoverclass.Contains("hover"))
+        {
+            hoverclass = "";
+        }
+        else
+        {
+            hoverclass = "hover";
+        }
+    }
+
+    private async void OpenPage()
+    {
+        await ProtectedSessionStore.SetAsync("pageid", Model.Page);
+        await ProtectedSessionStore.SetAsync("pagename", Model.Name);
+        NavigationManager.NavigateTo("/Notes");
+    }
+
+}

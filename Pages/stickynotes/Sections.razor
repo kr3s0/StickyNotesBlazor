@@ -1,0 +1,162 @@
+﻿@page "/Sections"
+@using Microsoft.AspNetCore.ProtectedBrowserStorage
+@using DataAccess.Models
+@using DataAccess.BusinessLogic 
+@using StickyNotesBlazor.Models
+
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+@inject IUserData user_db
+@inject ISectionData section_db
+
+@if(SectionsForUser is null)
+{
+    <Loader></Loader>
+}
+else
+{
+<div class="row">
+    <div class="col align-self-start">
+        <h2>Sections</h2>
+    </div>
+    <div class="col align-self-center">
+        <div class="search">
+            <span class="fa fa-search"></span>
+            <input @bind-value="SearchTerm" @bind-value:event="oninput" placeholder="Search sections"/>
+        </div>
+    </div>
+    <div class="col align-self-end">
+        <span class="text-muted ml-5">
+            Showing @FilteredSectionsForUser.Count out of @SectionsForUser.Count
+        </span>
+    </div>
+</div>
+<div class="image">
+    @foreach (SectionModel section in FilteredSectionsForUser)
+    {
+        <OneSection Model="section" OnClickCallback="@DeleteSection"></OneSection>
+    }
+
+    <div class="container-fluid">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="section">
+                    <div class="card shadow">
+                        <div class="card-body">
+                            <EditForm Model="@sectionModel" OnSubmit="@SubmitSection">
+                                <div class="row text-center ">
+                                    <div class="col-md-1 mr-2">
+                                        <img src="/save.svg" height="80px" width="80px" /><br><br>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <InputText class="form-control" placeholder="Add new section name" @bind-Value="@sectionModel.Name" />
+                                        <InputText class="form-control" placeholder="Add new section description" @bind-Value="@sectionModel.Description" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <InputText class="form-control" placeholder="@DateTime.Now.ToString("dd/MM/yyyy")" @bind-Value="@sectionModel.DateOfCreation" />
+                                        <small>Section was created at <span class="oi oi-chevron-top" aria-hidden="true" /></small>
+                                        <div class="sub-row">
+                                            <button type="submit" class="btn btn-warning btn-sm btn-block">Add new section</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </EditForm>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="@ModalToggler" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header modal-myheader">
+                <h5 class="modal-title"><span class="oi oi-chevron-bottom"></span> The Stickies</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="@(()=>ModalToggler="modal-hide")">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>@alert</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-myfooter" data-dismiss="modal" @onclick="@(()=>ModalToggler="modal-hide")">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@code {
+    public int userid;
+
+    public string SearchTerm { get; set; } = "";
+
+    DisplaySectionModel sectionModel = new DisplaySectionModel();
+
+    List<SectionModel> SectionsForUser;
+
+    List<SectionModel> FilteredSectionsForUser => SectionsForUser.Where(s=>s.Name.ToLower().Contains(SearchTerm.ToLower()) || s.Description.ToLower().Contains(SearchTerm.ToLower())).ToList();
+
+    string alert = "";
+
+    private string ModalToggler = "modal-hide";
+
+    protected async override Task OnInitializedAsync()
+    {
+        userid = await ProtectedSessionStore.GetAsync<int>("userid");
+        if (userid == 0)
+        {
+            NavigationManager.NavigateTo("/Home");
+        }
+        else
+        {
+            SectionsForUser = await user_db.GetSectionsForUser(userid);
+        }
+    }
+
+    private async Task SubmitSection()
+    {
+        if (userid != 0)
+        {
+            if (!String.IsNullOrEmpty(sectionModel.Name))
+            {
+                if (String.IsNullOrEmpty(sectionModel.DateOfCreation))
+                {
+                    sectionModel.DateOfCreation = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                }
+                Task InsertTask = section_db.InsertSection(sectionModel.GetDatabaseModel(userid));
+                SectionsForUser.Add(sectionModel.GetDatabaseModel(userid));
+                await InsertTask;
+                alert = "New section is submitted and save to database.";
+            }
+            else
+            {
+                alert = "You can not add new section without a name.";
+            }
+        }
+        else
+        {
+            alert = "Something is wrong. Action has failed.";
+        }
+        ModalToggler = "modal-show";
+        sectionModel = new DisplaySectionModel();
+    }
+
+    public async void DeleteSection(int? sectionid)
+    {
+        Task DeleteSection = section_db.DeleteSection(sectionid.Value);
+
+        var ItemToRemove = SectionsForUser.SingleOrDefault(s => s.Section == sectionid.Value);
+
+        SectionsForUser.Remove(ItemToRemove);
+
+        await DeleteSection;
+
+        alert = "Section has been removed from the database.";
+
+        ModalToggler = "modal-show";
+    }
+
+}

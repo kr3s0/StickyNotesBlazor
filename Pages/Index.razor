@@ -1,0 +1,88 @@
+﻿@page "/Home"
+
+@using Microsoft.AspNetCore.ProtectedBrowserStorage
+@using DataAccessLibrary.BusinessLogic;
+
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject IMetaData meta_db
+
+@if (userid != 0)
+{
+    <h1>Welcome @username, this is your notebook.</h1>
+    @if (NumberOfSectionForUser == -1 || NumberOfPagesForUser == -1 || NumberOfNotesForUser == -1)
+    {
+        <Loader></Loader>
+    }
+    else
+    {
+        <table id="customers">
+            <tr>
+                <th></th>
+                <th>Item</th>
+                <th>Quantity</th>
+            </tr>
+            <tr>
+                <td>#</td>
+                <td>Sections</td>
+                <td>@NumberOfSectionForUser</td>
+            </tr>
+            <tr>
+                <td>#</td>
+                <td>Pages</td>
+                <td>@NumberOfPagesForUser</td>
+            </tr>
+            <tr>
+                <td>#</td>
+                <td>Notes</td>
+                <td>@NumberOfNotesForUser</td>
+            </tr>
+        </table>
+    }
+}
+else
+{
+    <table>
+        <tr>
+            <td>
+                <UserForm TypeOfForm="Log in" />
+            </td>
+            <td>
+                <UserForm TypeOfForm="Register" />
+            </td>
+        </tr>
+    </table>
+
+}
+
+@code{
+    int userid = 0;
+
+    string username = "";
+
+    int NumberOfSectionForUser = -1;
+
+    int NumberOfPagesForUser = -1;
+
+    int NumberOfNotesForUser = -1;
+
+    protected async override Task OnInitializedAsync()
+    {
+        ValueTask<int> GetCookieLog = ProtectedSessionStore.GetAsync<int>("userid");
+        ValueTask<string> GetCookieUsername = ProtectedSessionStore.GetAsync<string>("username");
+
+
+        userid = await GetCookieLog;
+        username = await GetCookieUsername;
+
+        var GetTask1 = meta_db.GetNumberOfBsonsInCollection("sections", userid);
+        var GetTask2 = meta_db.GetNumberOfBsonsInCollection("pages", userid);
+        var GetTask3 = meta_db.GetNumberOfBsonsInCollection("notes", userid);
+
+        NumberOfSectionForUser = await GetTask1;
+        NumberOfPagesForUser = await GetTask2;
+        NumberOfNotesForUser = await GetTask3;
+    }
+
+
+
+}

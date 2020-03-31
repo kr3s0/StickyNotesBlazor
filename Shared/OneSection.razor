@@ -1,0 +1,50 @@
+﻿@using DataAccess.Models
+@using Microsoft.AspNetCore.ProtectedBrowserStorage
+
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="section">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <div class="row text-center ">
+                            <div class="col-md-1 mr-2">
+                                <img src="/files-and-folders.svg" /><br>
+                            </div>
+                            <div class="col-md-6">
+                                <h4>@Model.Name</h4>
+                                <p>@Model.Description</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h3>@Model.DateOfCreation</h3>
+                                <small>Section was created at <span class="oi oi-chevron-top" aria-hidden="true" /></small>
+                                <div class="sub-row">
+                                    <button type="button" class="btn btn-warning btn-sm btn-block" @onclick="@OpenSection">Open Section</button>
+                                </div>
+                            </div>
+                            <a href="Sections" class="text-danger pull-right" @onclick="@(()=>OnClickCallback.InvokeAsync(Model.Section))"><i class="fa fa-trash-o "> Delete</i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    [Parameter]
+    public SectionModel Model { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> OnClickCallback { get; set; }
+
+    private async void OpenSection()
+    {
+        await ProtectedSessionStore.SetAsync("sectionid", Model.Section);
+        await ProtectedSessionStore.SetAsync("sectionname", Model.Name);
+        NavigationManager.NavigateTo("/Pages");
+    }
+
+}

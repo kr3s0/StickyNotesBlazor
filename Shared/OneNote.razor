@@ -1,0 +1,19 @@
+﻿@using DataAccess.Models
+
+<div class="@ColorStyle">
+    <small>@Model.DateOfCreation</small>
+    <h4>@Model.Title</h4>
+    <p>@Model.Content</p>
+    <a href="Notes" class="text-danger pull-right" @onclick="@(()=>OnClickCallback.InvokeAsync(Model))"><i class="fa fa-trash-o "> Delete</i></a>
+</div>
+
+@code{
+    [Parameter]
+    public NoteModel Model { get; set; }
+
+    [Parameter]
+    public string ColorStyle { get; set; }
+
+    [Parameter]
+    public EventCallback<NoteModel> OnClickCallback { get; set; }
+}

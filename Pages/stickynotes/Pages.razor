@@ -1,0 +1,156 @@
+﻿@page "/Pages"
+
+@using DataAccess.Models
+@using DataAccess.BusinessLogic
+@using StickyNotesBlazor.Models
+@using Microsoft.AspNetCore.ProtectedBrowserStorage
+
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+@inject IPageData page_db
+@inject ISectionData section_db
+
+@if (PagesForSection is null)
+{
+    <Loader></Loader>
+}
+else
+{
+    <div class="row">
+        <div class="col align-self-start">
+            <h3>Pages for <b>@sectionname</b> section: </h3>
+        </div>
+        <div class="col align-self-center">
+            <div class="search">
+                <span class="fa fa-search"></span>
+                <input @bind-value="SearchTerm" @bind-value:event="oninput" placeholder="Search pages" />
+            </div>
+        </div>
+        <div class="col align-self-end">
+            <span class="text-muted ml-5">
+                Showing @FilteredPagesForSection.Count out of @PagesForSection.Count
+            </span>
+        </div>
+    </div>
+    <section id="team" class="pb-0">
+        <div class="container">
+            <div class="row">
+                @foreach (PageModel page in FilteredPagesForSection)
+                {
+                    <OnePage Model="page" SectionName="@(sectionname == null ? "default" : sectionname)" OnClickCallback="@DeletePage"></OnePage>
+                }
+                <div class="card" style="width: 19rem; height:20rem;">
+                    <EditForm Model="@NewPage" OnValidSubmit="@SubmitPage">
+                        <DataAnnotationsValidator />
+                        <div class="card-body">
+                            <InputText class="form-control" placeholder="Add new page name" @bind-Value="@NewPage.Title" />
+                            <br />
+                            <InputText class="form-control" placeholder="@DateTime.Now.ToShortDateString()" @bind-Value="@NewPage.DateOfCreation" />
+                            <br />
+                            <InputText class="form-control" placeholder="Add new page details" @bind-Value="@NewPage.Content" />
+                            <br />
+                            <button type="submit" class="btn-danger">Add new Page</button>
+                            <ValidationSummary />
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+<div id="@ModalToggler" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header modal-myheader">
+                <h5 class="modal-title"><span class="oi oi-chevron-bottom"></span> The Stickies</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="@(()=>ModalToggler="modal-hide")">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>@alert</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-myfooter" data-dismiss="modal" @onclick="@(()=>ModalToggler="modal-hide")">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    public int sectionid = 0;
+    public string sectionname = null;
+
+    public string SearchTerm { get; set; } = "";
+
+    public DisplayPageModel NewPage = new DisplayPageModel();
+
+    List<PageModel> PagesForSection;
+
+    List<PageModel> FilteredPagesForSection => PagesForSection.Where(p => p.Name.ToLower().Contains(SearchTerm.ToLower()) || p.Details.ToLower().Contains(SearchTerm.ToLower())).ToList();
+
+    public string alert = "";
+
+    private string ModalToggler = "modal-hide";
+
+    protected async override Task OnInitializedAsync()
+    {
+        sectionid = await ProtectedSessionStore.GetAsync<int>("sectionid");
+        ValueTask<string> GetSectionName = ProtectedSessionStore.GetAsync<string>("sectionname");
+        if (sectionid == 0)
+        {
+            int userid = await ProtectedSessionStore.GetAsync<int>("userid");
+            if (userid == 0)
+            {
+                NavigationManager.NavigateTo("/Home");
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/Sections");
+            }
+        }
+        else
+        {
+            sectionname = await GetSectionName;
+            PagesForSection = await section_db.GetPagesForSection(sectionid);
+        }
+    }
+
+    private async Task SubmitPage()
+    {
+        ValueTask<int> GetUserId = ProtectedSessionStore.GetAsync<int>("userid");
+        if (!String.IsNullOrEmpty(NewPage.Title))
+        {
+            if (String.IsNullOrEmpty(NewPage.DateOfCreation))
+            {
+                NewPage.DateOfCreation = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+            }
+            int userid = await GetUserId;
+            Task InsertTask = page_db.InsertPage(NewPage.GetDatabaseModel(userid, sectionid));
+            PagesForSection.Add(NewPage.GetDatabaseModel(userid, sectionid));
+            await InsertTask;
+            alert = "New page is submitted and save to database.";
+        }
+        else
+        {
+            alert = "You can not add new page without a name.";
+        }
+        ModalToggler = "modal-show";
+        NewPage = new DisplayPageModel();
+    }
+
+    public async void DeletePage(int? pageid)
+    {
+        var DeleteTask = page_db.DeletePage(pageid.Value);
+
+        var ItemToRemove = PagesForSection.SingleOrDefault(p => p.Page == pageid.Value);
+
+        PagesForSection.Remove(ItemToRemove);
+
+        await DeleteTask;
+
+        alert = "Page has been deleted from the database";
+
+        ModalToggler = "modal-show";
+    }
+}

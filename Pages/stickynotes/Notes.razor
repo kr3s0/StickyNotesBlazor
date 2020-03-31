@@ -1,0 +1,172 @@
+﻿@page "/Notes"
+
+@using DataAccess.Models
+@using DataAccess.BusinessLogic
+@using Microsoft.AspNetCore.ProtectedBrowserStorage
+@using StickyNotesBlazor.Models
+
+@inject ProtectedSessionStorage ProtectedSessionStore
+@inject NavigationManager NavigationManager
+@inject INoteData note_db
+@inject IPageData page_db
+
+
+@if (notes is null)
+{
+    <Loader></Loader>
+}
+else
+{
+    <div class="row">
+        <div class="col align-self-start">
+            <h2>Notes for <b>@PageName</b> page: </h2>
+        </div>
+        <div class="col align-self-center">
+            <div class="search">
+                <span class="fa fa-search"></span>
+                <input @bind-value="SearchTerm" @bind-value:event="oninput" placeholder="Search pages" />
+            </div>
+        </div>
+        <div class="col align-self-end">
+            <span class="text-muted ml-5">
+                Showing @FilteredNotes.Count out of @notes.Count
+            </span>
+        </div>
+    </div>
+    <div class="container bootstrap snippet">
+        <div class="row">
+            <ul class="notes">
+                @foreach (NoteModel note in FilteredNotes)
+                {
+                    <li>
+                        <OneNote Model="note" ColorStyle="@(ColorStyles[new Random().Next(ColorStyles.Length)])" OnClickCallback="@DeleteNote"></OneNote>
+                    </li>
+
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="card note" style="width: 18rem;">
+        <EditForm Model="@NewNote" OnValidSubmit="@SubmitNote">
+            <DataAnnotationsValidator />
+            <div class="card-body">
+                <InputText class="form-control" placeholder="Add new page name" @bind-Value="@NewNote.Name" />
+                <br />
+                <InputText class="form-control" placeholder="@DateTime.Now.ToShortDateString()" @bind-Value="@NewNote.DateOfCreation" />
+                <br />
+                <InputText class="form-control" placeholder="Add new page details" @bind-Value="@NewNote.Details" />
+                <br />
+                <ValidationSummary />
+                <button type="submit" class="btn-danger">Add new Note</button>
+            </div>
+        </EditForm>
+    </div>
+    <div id="@ModalToggler" class="modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header modal-myheader">
+                    <h5 class="modal-title"><span class="oi oi-chevron-bottom"></span> The Stickies</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" @onclick="@(()=>ModalToggler="modal-hide")">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>@alert</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-myfooter" data-dismiss="modal" @onclick="@(()=>ModalToggler="modal-hide")">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public string SearchTerm { get; set; } = "";
+
+    public DisplayNoteModel NewNote = new DisplayNoteModel();
+
+    public List<NoteModel> notes;
+
+    public List<NoteModel> FilteredNotes => notes.Where(n => n.Title.ToLower().Contains(SearchTerm.ToLower()) || n.Content.ToLower().Contains(SearchTerm.ToLower())).ToList();
+
+    public int pageid = 0;
+
+    public string PageName = null;
+
+    public string alert = "";
+
+    private string ModalToggler = "modal-hide";
+
+    public string[] ColorStyles = new[] { "rotate-1 lazur-bg", "rotate-1 yellow-bg", "rotate-2 red-bg" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        pageid = await ProtectedSessionStore.GetAsync<int>("pageid");
+        PageName = await ProtectedSessionStore.GetAsync<string>("pagename");
+        if (pageid == 0)
+        {
+            int sectionid = await ProtectedSessionStore.GetAsync<int>("sectionid");
+            if (sectionid == 0)
+            {
+                int userid = await ProtectedSessionStore.GetAsync<int>("userid");
+                if (userid == 0)
+                {
+                    NavigationManager.NavigateTo("/Home");
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("/Sections");
+                }
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/Pages");
+            }
+        }
+        else
+        {
+            notes = await page_db.GetNotesForPage(pageid);
+        }
+
+    }
+
+    public async Task SubmitNote()
+    {
+        var GetUserId = ProtectedSessionStore.GetAsync<int>("userid");
+        var GetSectionId = ProtectedSessionStore.GetAsync<int>("sectionid");
+        if (!String.IsNullOrEmpty(NewNote.Name))
+        {
+            if (String.IsNullOrEmpty(NewNote.DateOfCreation))
+            {
+                NewNote.DateOfCreation = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+            }
+            int userid = await GetUserId;
+            int sectionid = await GetSectionId;
+            notes.Add(NewNote.GetDatabaseModel(userid, sectionid, pageid));
+            await note_db.InsertNote(NewNote.GetDatabaseModel(userid, sectionid, pageid));
+            alert = "New note is added to the database.";
+        }
+        else
+        {
+            alert = "You cannot add a note without note title.";
+        }
+        ModalToggler = "modal-show";
+    }
+
+    public async void DeleteNote(NoteModel note)
+    {
+        var DeleteTask = note_db.DeleteNote(note);
+
+        var ItemToRemove = notes.SingleOrDefault(n => ((n.Page == note.Page) && (n.Title == note.Title) && (n.Content == note.Content)));
+
+        notes.Remove(ItemToRemove);
+
+        await DeleteTask;
+
+        alert = "Note has been deleted from the database";
+
+        ModalToggler = "modal-show";
+    }
+
+}

@@ -1,0 +1,38 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.ProtectedBrowserStorage
+
+@inject ProtectedSessionStorage ProtectedSessionStore
+
+<div class="sidebar">
+    <NavMenu />
+</div>
+
+<div class="main">
+    <div class="top-row px-4">
+        <a href="#" @onclick="@Logout">Logout</a>
+    </div>
+
+    <div class="content px-4">
+        @Body
+    </div>
+</div>
+
+@code{
+    public async void Logout()
+    {
+        var LogoutTask1 = ProtectedSessionStore.DeleteAsync("userid");
+
+        var LogoutTask2 = ProtectedSessionStore.DeleteAsync("username");
+
+        var LogoutTask3 = ProtectedSessionStore.DeleteAsync("sectionid");
+
+        var LogoutTask4 = ProtectedSessionStore.DeleteAsync("sectionname");
+
+        var LogoutTask5 = ProtectedSessionStore.DeleteAsync("pageid");
+
+        var LogoutTask6 = ProtectedSessionStore.DeleteAsync("pagename");
+
+        await Task.WhenAll(LogoutTask1.AsTask(), LogoutTask2.AsTask(), LogoutTask3.AsTask(), LogoutTask4.AsTask(), LogoutTask5.AsTask(), LogoutTask6.AsTask());
+
+    }
+}
